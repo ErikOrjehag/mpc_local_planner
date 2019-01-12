@@ -1,8 +1,30 @@
 
-// states: x, v
-// control: a
+// states: px, py, heading, steer, v
+// control: steer_w, accel
+
+
+
+//////////////////////////////////////////////////////////////////////////
+////////////////             glider.cxx              /////////////////////
+//////////////////////////////////////////////////////////////////////////
+////////////////           PSOPT example            /////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////// Title: 	Hang glider problem               ////////////////
+//////// Last modified: 11 July 2009                      ////////////////
+//////// Reference:     PROPT User Manual                 ////////////////
+////////                                                  ////////////////
+//////////////////////////////////////////////////////////////////////////
+////////     Copyright (c) Victor M. Becerra, 2009        ////////////////
+//////////////////////////////////////////////////////////////////////////
+//////// This is part of the PSOPT software library, which ///////////////
+//////// is distributed under the terms of the GNU Lesser ////////////////
+//////// General Public License (LGPL)                    ////////////////
+//////////////////////////////////////////////////////////////////////////
 
 #include "psopt.h"
+
+
 
 //////////////////////////////////////////////////////////////////////////
 ///////////////////  Define the end point (Mayer) cost function //////////
@@ -13,12 +35,8 @@ adouble endpoint_cost(adouble* initial_states, adouble* final_states,
                       adouble* parameters, adouble& t0, adouble& tf,
                       adouble* xad, int iphase, Workspace* workspace)
 {
-  adouble x = final_states[ CINDEX(1) ];
-  adouble v = final_states[ CINDEX(2) ];
-
-  //return 0;
-  return pow(x - 0.2, 2);
-}
+   return pow(final_states[ CINDEX(1) ] - 0.2, 2) + pow(final_states[ CINDEX(2) ] - 0.1, 2);
+  }
 
 //////////////////////////////////////////////////////////////////////////
 ///////////////////  Define the integrand (Lagrange) cost function  //////
@@ -27,14 +45,11 @@ adouble endpoint_cost(adouble* initial_states, adouble* final_states,
 adouble integrand_cost(adouble* states, adouble* controls, adouble* parameters,
                      adouble& time, adouble* xad, int iphase, Workspace* workspace)
 {
-  adouble x = states[ CINDEX(1) ];
-  adouble v = states[ CINDEX(2) ];
-  return 1;
-  //return pow(v - 0.3, 2);
-  //return pow(x - 0.2, 2) + pow(v-10, 2);
-  //return 0;
-  //return pow(controls[0], 2);
-  //return pow(controls[ CINDEX(1) ], 2);
+  adouble steer_w = controls[ CINDEX(1) ];
+  adouble accel   = controls[ CINDEX(2) ];
+  adouble steer 	= states[ CINDEX(4) ];
+
+   return pow(steer, 2) + pow(steer_w, 2) + pow(accel, 2);
 }
 
 
@@ -47,11 +62,30 @@ void dae(adouble* derivatives, adouble* path, adouble* states,
          adouble* controls, adouble* parameters, adouble& time,
          adouble* xad, int iphase, Workspace* workspace)
 {
-    adouble x = states[ CINDEX(1) ];
-    adouble v = states[ CINDEX(2) ];
 
-    derivatives[ CINDEX(1) ] = v;
-    derivatives[ CINDEX(2) ] = controls[ CINDEX(1) ];
+    adouble steer_w 	= controls[ CINDEX(1) ];
+    adouble accel   	= controls[ CINDEX(2) ];
+
+    adouble px 	    = states[ CINDEX(1) ];
+    adouble py 	    = states[ CINDEX(2) ];
+    adouble heading = states[ CINDEX(3) ];
+    adouble steer 	= states[ CINDEX(4) ];
+    adouble v 	    = states[ CINDEX(5) ];
+
+    double magic = 0.8;
+    double size = 1.5;
+
+    adouble d_px 	    = v * cos(heading);
+    adouble d_py 	    = v * sin(heading);
+    adouble d_heading = steer * v / (size * magic);
+    adouble d_steer 	= steer_w;
+    adouble d_v 	    = accel;
+
+    derivatives[ CINDEX(1) ] = d_px;
+    derivatives[ CINDEX(2) ] = d_py;
+    derivatives[ CINDEX(3) ] = d_heading;
+    derivatives[ CINDEX(4) ] = d_steer;
+    derivatives[ CINDEX(5) ] = d_v;
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -70,8 +104,29 @@ void events(
   Workspace* workspace
 )
 {
-    e[ CINDEX(1) ] = initial_states[ CINDEX(1) ];
-    e[ CINDEX(2) ] = initial_states[ CINDEX(2) ];
+    adouble px_0 	    = initial_states[ CINDEX(1) ];
+    adouble py_0 	    = initial_states[ CINDEX(2) ];
+    adouble heading_0 = initial_states[ CINDEX(3) ];
+    adouble steer_0 	= initial_states[ CINDEX(4) ];
+    adouble v_0 	    = initial_states[ CINDEX(5) ];
+
+    adouble px_f 	    = final_states[ CINDEX(1) ];
+    adouble py_f 	    = final_states[ CINDEX(2) ];
+    adouble heading_f = final_states[ CINDEX(3) ];
+    adouble steer_f 	= final_states[ CINDEX(4) ];
+    adouble v_f 	    = final_states[ CINDEX(5) ];
+
+    e[ CINDEX(1) ] = px_0;
+    e[ CINDEX(2) ] = py_0;
+    e[ CINDEX(3) ] = heading_0;
+    e[ CINDEX(4) ] = steer_0;
+    e[ CINDEX(5) ] = v_0;
+
+    e[ CINDEX(6) ]  = px_f;
+    e[ CINDEX(7) ]  = py_f;
+    e[ CINDEX(8) ]  = heading_f;
+    e[ CINDEX(9) ]  = steer_f;
+    e[ CINDEX(10) ] = v_f;
 }
 
 
@@ -82,7 +137,9 @@ void events(
 
 void linkages( adouble* linkages, adouble* xad, Workspace* workspace)
 {
+
    // Single phase problem
+
 }
 
 
@@ -106,8 +163,8 @@ int main(void)
 ///////////////////  Register problem name  ////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 
-    problem.name        		= "Trashbot problem";
-    problem.outfilename     = "trashbot.txt";
+    problem.name        		= "Forklift problem";
+    problem.outfilename     = "forklift.txt";
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////  Define problem level constants & do level 1 setup ////////////
@@ -122,42 +179,61 @@ int main(void)
 /////////   Define phase related information & do level 2 setup  ////////////
 /////////////////////////////////////////////////////////////////////////////
 
-    problem.phases(1).nstates   = 2;
-    problem.phases(1).ncontrols = 1;
-    problem.phases(1).nevents   = 2;
-    problem.phases(1).npath     = 0;
-    problem.phases(1).nodes     = 5; //30 40 50 80
+    problem.phases(1).nstates   		= 5;
+    problem.phases(1).ncontrols 		= 2;
+    problem.phases(1).nevents   		= 10;
+    problem.phases(1).npath     		= 0;
+    problem.phases(1).nodes                     = "[20]"; //30 40 50 80
+
 
     psopt_level2_setup(problem, algorithm);
+
+
 
 ////////////////////////////////////////////////////////////////////////////
 ///////////////////  Enter problem bounds information //////////////////////
 ////////////////////////////////////////////////////////////////////////////
 
-    problem.phases(1).bounds.lower.states(1) = -10; // x
-    problem.phases(1).bounds.upper.states(1) =  10;
+    problem.phases(1).bounds.lower.states(1) = -1e6; // px
+    problem.phases(1).bounds.upper.states(1) =  1e6;
 
-    problem.phases(1).bounds.lower.states(2) = -0.3; // v
-    problem.phases(1).bounds.upper.states(2) =  0.3;
+    problem.phases(1).bounds.lower.states(2) = -1e6; // py
+    problem.phases(1).bounds.upper.states(2) =  1e6;
 
-    problem.phases(1).bounds.lower.controls(1) = -3.0; // a
-    problem.phases(1).bounds.upper.controls(1) = 3.0;
+    problem.phases(1).bounds.lower.states(3) = -1e6; // heading
+    problem.phases(1).bounds.upper.states(3) =  1e6;
 
-    problem.phases(1).bounds.lower.events(1) = 0.0; // x_0
-    problem.phases(1).bounds.upper.events(1) = problem.phases(1).bounds.lower.events(1);
+    problem.phases(1).bounds.lower.states(4) = -1.57; // steer (pi/2)
+    problem.phases(1).bounds.upper.states(4) =  1.57;
 
-    problem.phases(1).bounds.lower.events(2) = 0.0; // v_0
-    problem.phases(1).bounds.upper.events(2) = problem.phases(1).bounds.lower.events(2);
+    problem.phases(1).bounds.lower.states(5) = -0.1; // v
+    problem.phases(1).bounds.upper.states(5) =  0.1;
 
-    problem.phases(1).bounds.lower.StartTime = 0.0;
-    problem.phases(1).bounds.upper.StartTime = problem.phases(1).bounds.upper.StartTime;
+    problem.phases(1).bounds.lower.controls(1) = -0.1; // steer_w
+    problem.phases(1).bounds.upper.controls(1) = 0.1;
 
-    problem.phases(1).bounds.lower.EndTime = 2.0;
-    problem.phases(1).bounds.upper.EndTime = 2.0;
+    problem.phases(1).bounds.lower.controls(2) = -0.1; // accel
+    problem.phases(1).bounds.upper.controls(2) = 0.1;
+
+    //                                         px_0    py_0   heading_0   steer_0   v_0    px_f   py_f  heading_f   steer_f  v_f
+    problem.phases(1).bounds.lower.events(6) = 0.2; // px_f
+    problem.phases(1).bounds.upper.events(6) = 0.2; // px_f
+
+    problem.phases(1).bounds.lower.events(7) = 0.1; // py_f
+    problem.phases(1).bounds.upper.events(7) = 0.1; // py_f
+
+    problem.phases(1).bounds.lower.StartTime    = 0.0;
+    problem.phases(1).bounds.upper.StartTime    = 0.0;
+
+    problem.phases(1).bounds.lower.EndTime      = 0.0;
+    problem.phases(1).bounds.upper.EndTime      = 200.0;
+
+
 
 ////////////////////////////////////////////////////////////////////////////
 ///////////////////  Register problem functions  ///////////////////////////
 ////////////////////////////////////////////////////////////////////////////
+
 
     problem.integrand_cost = &integrand_cost;
     problem.endpoint_cost  = &endpoint_cost;
@@ -174,25 +250,31 @@ int main(void)
     int nstates            = problem.phases(1).nstates;
 
     DMatrix state_guess    =  zeros(nstates, nnodes);
-    DMatrix control_guess  =  0.5 * ones(ncontrols, nnodes);
-    DMatrix time_guess     =  linspace(0.0, 1.0, nnodes);
+    DMatrix control_guess  =  1.0 * ones(ncontrols, nnodes);
+    DMatrix time_guess     =  linspace(0.0, 5.0, nnodes);
 
     state_guess(1, colon()) = linspace(0.0, 0.2, nnodes);
+    state_guess(2, colon()) = linspace(0.0, 0.1, nnodes);
+    //state_guess(3, colon()) = 13.23 * ones(1, nnodes);
 
     problem.phases(1).guess.states   = state_guess;
     problem.phases(1).guess.controls = control_guess;
     problem.phases(1).guess.time     = time_guess;
 
+
+
 ////////////////////////////////////////////////////////////////////////////
 ///////////////////  Enter algorithm options  //////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
 
+
     algorithm.nlp_iter_max                = 1000; //= 1000;
-    algorithm.nlp_tolerance               = 1.e-6; //= 1.e-6;
+    algorithm.nlp_tolerance               = 1.e-3; //= 1.e-6;
     algorithm.nlp_method                  = "IPOPT";
     algorithm.scaling                     = "automatic";
     algorithm.derivatives                 = "automatic";
     algorithm.collocation_method          = "Legendre";
+
 
 ////////////////////////////////////////////////////////////////////////////
 ///////////////////  Now call PSOPT to solve the problem   //////////////////
@@ -203,6 +285,7 @@ int main(void)
 ////////////////////////////////////////////////////////////////////////////
 ///////////  Extract relevant variables from solution structure   //////////
 ////////////////////////////////////////////////////////////////////////////
+
 
     DMatrix x, u, t;
 
